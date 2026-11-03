@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Task tracker</title>
+    <style>
+      :root { color-scheme: light; font-family: system-ui, sans-serif; }
+      body { max-width: 42rem; margin: 3rem auto; padding: 0 1rem; color: #202124; }
+      h1 { margin-bottom: .25rem; }
+      .hint { margin-top: 0; color: #5f6368; }
+      form { display: flex; gap: .5rem; margin: 1.5rem 0; }
+      input { flex: 1; min-width: 0; padding: .65rem; }
+      button { padding: .55rem .8rem; cursor: pointer; }
+      li { display: flex; align-items: center; gap: .6rem; padding: .55rem 0; border-bottom: 1px solid #dadce0; }
+      li span { flex: 1; overflow-wrap: anywhere; }
+      li.done span { color: #5f6368; text-decoration: line-through; }
+      #message { min-height: 1.5em; color: #b3261e; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Task tracker</h1>
+      <p class="hint">A small app for practicing bug reports, fixes, and rollbacks.</p>
+      <form id="task-form">
+        <input id="task-title" name="title" maxlength="200" placeholder="What needs doing?" required>
+        <button type="submit">Add task</button>
+      </form>
+      <p id="message" role="status" aria-live="polite"></p>
+      <ul id="tasks" aria-label="Tasks"></ul>
+    </main>
+    <script>
+      const list = document.querySelector("#tasks");
+      const message = document.querySelector("#message");
+
+      async function request(path, options) {
+        const response = await fetch(path, options);
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Request failed");
+        return data;
+      }
+
+      async function refresh() {
+        const { tasks } = await request("/api/tasks");
+        list.replaceChildren();
+        for (const task of tasks) {
+          const item = document.createElement("li");
+          item.classList.toggle("done", task.done);
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.checked = task.done;
+          checkbox.setAttribute("aria-label", `Mark ${task.title} as complete`);
+          checkbox.addEventListener("change", async () => {
+            try {
+              await request(`/api/tasks/${task.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ done: checkbox.checked })
+              });
+              await refresh();
+            } catch (error) {
+              message.textContent = error.message;
+            }
+          });
+          const label = document.createElement("span");
+          label.textContent = task.title;
+          const remove = document.createElement("button");
+          remove.type = "button";
+          remove.textContent = "Delete";
+          remove.setAttribute("aria-label", `Delete ${task.title}`);
+          remove.addEventListener("click", async () => {
+            try {
+              await request(`/api/tasks/${task.id}`, { method: "DELETE" });
+              await refresh();
+            } catch (error) {
+              message.textContent = error.message;
+            }
+          });
+          item.append(checkbox, label, remove);
+          list.append(item);
+        }
+      }
+
+      document.querySelector("#task-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const input = document.querySelector("#task-title");
+        try {
+          await request("/api/tasks", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title: input.value })
+          });
+          input.value = "";
+          message.textContent = "";
+          await refresh();
+        } catch (error) {
+          message.textContent = error.message;
+        }
+      });
+
+      refresh().catch((error) => { message.textContent = error.message; });
+    </script>
+  </body>
+</html>
