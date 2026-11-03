@@ -191,3 +191,62 @@ if __name__ == "__main__":
         pass
     finally:
         server.server_close()
+
+
+import multiprocessing
+import threading
+import psutil
+import time
+
+# CPU Stress
+def cpu_worker():
+    while True:
+        x = 0
+        for i in range(1000000):
+            x += i * i
+
+# Memory Stress
+def memory_worker(memory_mb):
+    print(f"Allocating {memory_mb} MB RAM...")
+    data = bytearray(memory_mb * 1024 * 1024)
+
+    while True:
+        for i in range(0, len(data), 4096):
+            data[i] = (data[i] + 1) % 256
+        time.sleep(0.1)
+
+if __name__ == "__main__":
+
+    # Total CPU cores
+    total_cores = multiprocessing.cpu_count()
+
+    # Use about 90% CPU
+    cpu_processes = max(1, int(total_cores * 0.9))
+
+    # Available RAM
+    available_mb = psutil.virtual_memory().available // (1024 * 1024)
+
+    # Use about 90% of available RAM
+    memory_mb = int(available_mb * 0.9)
+
+    print(f"CPU Cores: {total_cores}")
+    print(f"Starting {cpu_processes} CPU stress workers")
+    print(f"Allocating {memory_mb} MB RAM")
+
+    # Start memory stress
+    threading.Thread(
+        target=memory_worker,
+        args=(memory_mb,),
+        daemon=True
+    ).start()
+
+    # Start CPU stress
+    workers = []
+    for _ in range(cpu_processes):
+        p = multiprocessing.Process(target=cpu_worker)
+        p.start()
+        workers.append(p)
+
+    for p in workers:
+        p.join()
+        
