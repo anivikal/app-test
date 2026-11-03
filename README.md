@@ -34,10 +34,4 @@ python -m unittest discover -s tests -v
 - `PATCH /api/tasks/{id}` — update `title` and/or boolean `done`
 - `DELETE /api/tasks/{id}` — delete a task
 
-## Version workflow
 
-- **V1 (current):** keep this working task tracker as the clean baseline.
-- **V2 (later, when requested):** introduce one intentional bug in its own commit; don't add bugs to V1.
-- **V3 and onward:** continue with the next agreed exercise as a separate version/commit, recording how to reproduce and resolve it.
-
-The project [Buggy App Lab skill](.github/skills/buggy-app-lab/SKILL.md) is a guide for those future exercises. For now, just run and use the clean app.
