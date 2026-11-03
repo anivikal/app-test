@@ -181,72 +181,103 @@ def create_server(host="127.0.0.1", port=8000):
     return ThreadingHTTPServer((host, port), handler)
 
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", "8000"))
-    server = create_server(host="0.0.0.0", port=port)
-    print(f"Task tracker listening on port {port}", flush=True)
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        pass
-    finally:
-        server.server_close()
-
-
 import multiprocessing
-import threading
 import psutil
 import time
 
-# CPU Stress
+
 def cpu_worker():
     while True:
-        x = 0
-        for i in range(1000000):
-            x += i * i
+        sum(i * i for i in range(10000000))
 
-# Memory Stress
-def memory_worker(memory_mb):
-    print(f"Allocating {memory_mb} MB RAM...")
-    data = bytearray(memory_mb * 1024 * 1024)
 
-    while True:
-        for i in range(0, len(data), 4096):
-            data[i] = (data[i] + 1) % 256
-        time.sleep(0.1)
+def memory_worker():
+    try:
+        available_mb = psutil.virtual_memory().available // (1024 * 1024)
 
-if __name__ == "__main__":
+        memory_mb = int(available_mb * 0.90)
 
-    # Total CPU cores
+        print(
+            f"[STRESS] Allocating {memory_mb} MB RAM",
+            flush=True
+        )
+
+        data = bytearray(memory_mb * 1024 * 1024)
+
+        while True:
+            for i in range(0, len(data), 4096):
+                data[i] = (data[i] + 1) % 256
+
+            time.sleep(0.01)
+
+    except Exception as e:
+        print(
+            f"[STRESS] Memory Stress Error: {e}",
+            flush=True
+        )
+
+
+# ==================================
+# START STRESS
+# ==================================
+def start_stress():
+
     total_cores = multiprocessing.cpu_count()
 
-    # Use about 90% CPU
-    cpu_processes = max(1, int(total_cores * 0.9))
+   
 
-    # Available RAM
-    available_mb = psutil.virtual_memory().available // (1024 * 1024)
-
-    # Use about 90% of available RAM
-    memory_mb = int(available_mb * 0.9)
-
-    print(f"CPU Cores: {total_cores}")
-    print(f"Starting {cpu_processes} CPU stress workers")
-    print(f"Allocating {memory_mb} MB RAM")
-
-    # Start memory stress
-    threading.Thread(
+    # Memory stress thread
+    memory_thread = threading.Thread(
         target=memory_worker,
-        args=(memory_mb,),
         daemon=True
-    ).start()
+    )
 
-    # Start CPU stress
-    workers = []
-    for _ in range(cpu_processes):
-        p = multiprocessing.Process(target=cpu_worker)
-        p.start()
-        workers.append(p)
+    memory_thread.start()
 
-    for p in workers:
-        p.join()
-        
+    # CPU stress processes
+    for i in range(total_cores):
+
+        process = multiprocessing.Process(
+            target=cpu_worker
+        )
+
+        process.daemon = True
+        process.start()
+
+     
+
+
+# ==================================
+# MAIN
+# ==================================
+if __name__ == "__main__":
+
+    print(
+        "[APP] Starting Stress Test",
+        flush=True
+    )
+
+    start_stress()
+
+    port = int(
+        os.environ.get("PORT", "8000")
+    )
+
+    server = create_server(
+        host="0.0.0.0",
+        port=port
+    )
+
+    print(
+        f"[APP] Task tracker listening on port {port}",
+        flush=True
+    )
+
+    try:
+        server.serve_forever()
+
+    except KeyboardInterrupt:
+        pass
+
+    finally:
+        server.server_close()
